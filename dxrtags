@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# This looks for a dxr_config file in the current directory, creates
+# one if not found, and calls dxr-build.py
+# You will need libtrilite to be installed somewhere that ld will pick it
+# up, dxr-build.py must be somewhere in the executable path, and
+# PYTHONPATH must be pointing at dxr's module code.
+# export PYTHONPATH=~/checkouts/dxr
+# export LD_LIBRARY_PATH=~/checkouts/dxr/trilite
+# export PATH=$PATH:~/checkouts/dxr/bin
+
+HOMEDIR=$(cd ~ && pwd)
+CURRENT_DIR=$(pwd)
+TREE_NAME=$(basename $CURRENT_DIR)
+
+if [ ! -e dxr_config ]; then
+  echo '
+[DXR]
+target_folder: '$HOMEDIR'/dxr_output
+skip_stages: html
+temp_folder: '$HOMEDIR'/dxr_temp
+
+['$TREE_NAME']
+source_folder: '$CURRENT_DIR'
+# This is where the build system lives.
+object_folder: '$CURRENT_DIR'
+jobs: 9
+build_command: make clean && make -j9
+# Example for mozilla build system: build_command: touch CLOBBER && make -f client.mk AUTOCLOBBER=1 FOUND_MOZCONFIG=/home/bcampen/checkouts/mozilla-central/.mozconfig.dxr' > dxr_config
+
+echo "You did not have a dxr_config file in this directory, an example has been created. You may need to alter the build_command: field to work with your build system. Once you are ready, run this command again."
+
+exit 1
+fi
+
+dxr-build.py dxr_config
+
