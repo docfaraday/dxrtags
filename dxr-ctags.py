@@ -1,8 +1,5 @@
 #!/usr/bin/python
 
-""" A cscope-like command-line query tool for dxr
-"""
-
 from argparse import ArgumentParser
 import string
 from string import Template
