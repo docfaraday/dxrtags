@@ -320,10 +320,10 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
 
     if matches['functions'] is not None:
         function_refs_query = Template("""
-            SELECT DISTINCT files.path,
-                            function_refs.file_line,
-                            function_refs.file_col,
-                            matching_functions.qualname
+            SELECT files.path,
+                   function_refs.file_line,
+                   function_refs.file_col,
+                   matching_functions.qualname
             FROM $matching_functions_table as matching_functions
             INNER JOIN function_refs ON function_refs.refid == matching_functions.id
             INNER JOIN files ON files.id == function_refs.file_id;
@@ -333,10 +333,10 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
 
     if matches['macros'] is not None:
         macro_refs_query = Template("""
-            SELECT DISTINCT files.path,
-                            macro_refs.file_line,
-                            macro_refs.file_col,
-                            matching_macros.name || matching_macros.args
+            SELECT files.path,
+                   macro_refs.file_line,
+                   macro_refs.file_col,
+                   matching_macros.name || matching_macros.args
             FROM $matching_macros_table AS matching_macros
             INNER JOIN macro_refs ON macro_refs.refid == matching_macros.id
             INNER JOIN files ON files.id == macro_refs.file_id;
@@ -346,10 +346,10 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
 
     if matches['types'] is not None:
         type_refs_query = Template("""
-            SELECT DISTINCT files.path,
-                            type_refs.file_line,
-                            type_refs.file_col,
-                            matching_types.qualname
+            SELECT files.path,
+                   type_refs.file_line,
+                   type_refs.file_col,
+                   matching_types.qualname
             FROM $matching_types_table AS matching_types
             INNER JOIN type_refs ON type_refs.refid == matching_types.id
             INNER JOIN files ON files.id == type_refs.file_id;
@@ -359,10 +359,10 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
 
     if matches['typedefs'] is not None:
         typedef_refs_query = Template("""
-            SELECT DISTINCT files.path,
-                            typedef_refs.file_line,
-                            typedef_refs.file_col,
-                            matching_typedefs.qualname
+            SELECT files.path,
+                   typedef_refs.file_line,
+                   typedef_refs.file_col,
+                   matching_typedefs.qualname
             FROM $matching_typedefs_table AS matching_typedefs
             INNER JOIN typedef_refs ON typedef_refs.refid == matching_typedefs.id
             INNER JOIN files ON files.id == typedef_refs.file_id;
@@ -372,10 +372,10 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
 
     if matches['variables'] is not None:
         variable_refs_query = Template("""
-            SELECT DISTINCT files.path,
-                            variable_refs.file_line,
-                            variable_refs.file_col,
-                            matching_variables.qualname
+            SELECT files.path,
+                   variable_refs.file_line,
+                   variable_refs.file_col,
+                   matching_variables.qualname
             FROM $matching_variables_table as matching_variables
             INNER JOIN variable_refs ON variable_refs.refid == matching_variables.id
             INNER JOIN files ON files.id == variable_refs.file_id;
