@@ -80,7 +80,7 @@ def clear_tags_file():
 # that will call this script with the necessary arguments, and then kick vim's
 # ctags integration to pull in the results. A little weird, but it works.)
 def query_and_write_tags_file(conn, query, token, sql_parameters = {}):
-    should_explain = False 
+    should_explain = True
     start_time = None
     if should_explain:
         res = conn.execute("EXPLAIN QUERY PLAN " + query, sql_parameters)
@@ -326,7 +326,8 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
                    matching_functions.qualname
             FROM $matching_functions_table as matching_functions
             INNER JOIN function_refs ON function_refs.refid == matching_functions.id
-            INNER JOIN files ON files.id == function_refs.file_id;
+            INNER JOIN files ON files.id == function_refs.file_id
+            ORDER BY matching_functions.rowid;
         """)
 
         query_and_write_tags_file(conn, function_refs_query.substitute(matching_functions_table = matches['functions']), token)
@@ -339,7 +340,8 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
                    matching_macros.name || matching_macros.args
             FROM $matching_macros_table AS matching_macros
             INNER JOIN macro_refs ON macro_refs.refid == matching_macros.id
-            INNER JOIN files ON files.id == macro_refs.file_id;
+            INNER JOIN files ON files.id == macro_refs.file_id
+            ORDER BY matching_macros.rowid;
         """)
 
         query_and_write_tags_file(conn, macro_refs_query.substitute(matching_macros_table = matches['macros']), token)
@@ -352,7 +354,8 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
                    matching_types.qualname
             FROM $matching_types_table AS matching_types
             INNER JOIN type_refs ON type_refs.refid == matching_types.id
-            INNER JOIN files ON files.id == type_refs.file_id;
+            INNER JOIN files ON files.id == type_refs.file_id
+            ORDER BY matching_types.rowid;
         """)
 
         query_and_write_tags_file(conn, type_refs_query.substitute(matching_types_table = matches['types']), token)
@@ -365,7 +368,8 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
                    matching_typedefs.qualname
             FROM $matching_typedefs_table AS matching_typedefs
             INNER JOIN typedef_refs ON typedef_refs.refid == matching_typedefs.id
-            INNER JOIN files ON files.id == typedef_refs.file_id;
+            INNER JOIN files ON files.id == typedef_refs.file_id
+            ORDER BY matching_typedefs.rowid;
         """)
 
         query_and_write_tags_file(conn, typedef_refs_query.substitute(matching_typedefs_table = matches['typedefs']), token)
@@ -378,7 +382,8 @@ def query_for_refs(conn, token, from_file, from_line_start, from_line_end):
                    matching_variables.qualname
             FROM $matching_variables_table as matching_variables
             INNER JOIN variable_refs ON variable_refs.refid == matching_variables.id
-            INNER JOIN files ON files.id == variable_refs.file_id;
+            INNER JOIN files ON files.id == variable_refs.file_id
+            ORDER BY matching_variables.rowid;
         """)
 
         query_and_write_tags_file(conn, variable_refs_query.substitute(matching_variables_table = matches['variables']), token)
@@ -391,89 +396,98 @@ def query_for_defs(conn, token, from_file, from_line_start, from_line_end):
     # function_decldef)
     if matches['functions'] is not None:
         function_defs_query = Template("""
-            SELECT DISTINCT files.path,
-                            function_decldef.definition_file_line,
-                            function_decldef.definition_file_col,
-                            matching_functions.qualname
+            SELECT files.path,
+                   function_decldef.definition_file_line,
+                   function_decldef.definition_file_col,
+                   matching_functions.qualname,
+                   matching_functions.rowid
             FROM $matching_functions_table AS matching_functions
             INNER JOIN function_decldef ON function_decldef.defid == matching_functions.id
             INNER JOIN files ON files.id == function_decldef.definition_file_id
             UNION
-            SELECT DISTINCT files.path,
-                            function_decldef.definition_file_line,
-                            function_decldef.definition_file_col,
-                            function_overrides.qualname
-            FROM functions AS function_overrides
-            INNER JOIN function_decldef ON function_decldef.defid == function_overrides.id
+            SELECT files.path,
+                   function_decldef.definition_file_line,
+                   function_decldef.definition_file_col,
+                   functions.qualname,
+                   matching_functions.rowid
+            FROM $matching_functions_table AS matching_functions
+            INNER JOIN targets ON targets.targetid == -matching_functions.id AND targets.targetid != -targets.funcid
+            INNER JOIN functions ON functions.id == targets.funcid
+            INNER JOIN function_decldef ON function_decldef.defid == functions.id
             INNER JOIN files ON files.id == function_decldef.definition_file_id
-            INNER JOIN targets ON targets.funcid == function_overrides.id
-            INNER JOIN $matching_functions_table AS matching_functions ON matching_functions.id == -targets.targetid
-              AND matching_functions.id != function_overrides.id
             UNION
-            SELECT DISTINCT files.path,
-                            matching_functions.file_line,
-                            matching_functions.file_col,
-                            matching_functions.qualname
+            SELECT files.path,
+                   matching_functions.file_line,
+                   matching_functions.file_col,
+                   matching_functions.qualname,
+                   matching_functions.rowid
             FROM $matching_functions_table AS matching_functions
             LEFT JOIN function_decldef ON function_decldef.defid == matching_functions.id
             INNER JOIN files ON files.id == matching_functions.file_id
-                WHERE function_decldef.defid IS NULL;
+                WHERE function_decldef.defid IS NULL
+            ORDER BY matching_functions.rowid;
         """)
 
         query_and_write_tags_file(conn, function_defs_query.substitute(matching_functions_table = matches['functions']), token)
 
     if matches['macros'] is not None:
         macro_defs_query = Template("""
-            SELECT DISTINCT files.path,
-                            matching_macros.file_line,
-                            matching_macros.file_col,
-                            matching_macros.name || matching_macros.args
+            SELECT files.path,
+                   matching_macros.file_line,
+                   matching_macros.file_col,
+                   matching_macros.name || matching_macros.args
             FROM $matching_macros_table AS matching_macros
-            INNER JOIN files ON files.id == matching_macros.file_id;
+            INNER JOIN files ON files.id == matching_macros.file_id
+            ORDER BY matching_macros.rowid;
         """)
 
         query_and_write_tags_file(conn, macro_defs_query.substitute(matching_macros_table = matches['macros']), token)
 
     if matches['types'] is not None:
         type_defs_query = Template("""
-            SELECT DISTINCT files.path,
-                            matching_types.file_line,
-                            matching_types.file_col,
-                            matching_types.qualname
+            SELECT files.path,
+                   matching_types.file_line,
+                   matching_types.file_col,
+                   matching_types.qualname
             FROM $matching_types_table AS matching_types
-            INNER JOIN files ON files.id == matching_types.file_id;
+            INNER JOIN files ON files.id == matching_types.file_id
+            ORDER BY matching_types.rowid;
         """)
 
         query_and_write_tags_file(conn, type_defs_query.substitute(matching_types_table = matches['types']), token)
 
     if matches['typedefs'] is not None:
         typedef_defs_query = Template("""
-            SELECT DISTINCT files.path,
-                            matching_typedefs.file_line,
-                            matching_typedefs.file_col,
-                            matching_typedefs.qualname
+            SELECT files.path,
+                   matching_typedefs.file_line,
+                   matching_typedefs.file_col,
+                   matching_typedefs.qualname
             FROM $matching_typedefs_table AS matching_typedefs
-            INNER JOIN files ON files.id == matching_typedefs.file_id;
+            INNER JOIN files ON files.id == matching_typedefs.file_id
+            ORDER BY matching_typedefs.rowid;
         """)
 
         query_and_write_tags_file(conn, typedef_defs_query.substitute(matching_typedefs_table = matches['typedefs']), token)
 
     if matches['variables'] is not None:
         variable_defs_query = Template("""
-            SELECT DISTINCT files.path,
-                            variable_decldef.definition_file_line,
-                            variable_decldef.definition_file_col,
-                            matching_variables.qualname
+            SELECT files.path,
+                   variable_decldef.definition_file_line,
+                   variable_decldef.definition_file_col,
+                   matching_variables.qualname,
+                   matching_variables.rowid
             FROM $matching_variables_table AS matching_variables
             INNER JOIN variable_decldef ON variable_decldef.defid == matching_variables.id
             INNER JOIN files ON files.id == variable_decldef.definition_file_id
             UNION
-            SELECT DISTINCT files.path,
-                            matching_variables.file_line,
-                            matching_variables.file_col,
-                            matching_variables.qualname
+            SELECT files.path,
+                   matching_variables.file_line,
+                   matching_variables.file_col,
+                   matching_variables.qualname,
+                   matching_variables.rowid
             FROM $matching_variables_table AS matching_variables
-            INNER JOIN files ON files.id == matching_variables.file_id;
+            INNER JOIN files ON files.id == matching_variables.file_id
+            ORDER BY matching_variables.rowid;
         """)
 
         query_and_write_tags_file(conn, variable_defs_query.substitute(matching_variables_table = matches['variables']), token)
@@ -489,58 +503,64 @@ def query_for_decls(conn, token, from_file, from_line_start, from_line_end):
 # intentional. This might need to change.
     if matches['functions'] is not None:
         function_decls_query = Template("""
-            SELECT DISTINCT files.path,
-                            function_decldef.file_line,
-                            function_decldef.file_col,
-                            matching_functions.qualname
+            SELECT files.path,
+                   function_decldef.file_line,
+                   function_decldef.file_col,
+                   matching_functions.qualname,
+                   matching_functions.rowid
             FROM $matching_functions_table AS matching_functions
             INNER JOIN function_decldef ON function_decldef.defid == matching_functions.id
             INNER JOIN files ON files.id == function_decldef.file_id
             UNION
-            SELECT DISTINCT files.path,
-                            matching_functions.file_line,
-                            matching_functions.file_col,
-                            matching_functions.qualname
+            SELECT files.path,
+                   matching_functions.file_line,
+                   matching_functions.file_col,
+                   matching_functions.qualname,
+                   matching_functions.rowid
             FROM $matching_functions_table AS matching_functions
             LEFT JOIN function_decldef ON function_decldef.defid == matching_functions.id
             INNER JOIN files ON files.id == matching_functions.file_id
-            WHERE function_decldef.defid IS NULL;
+            WHERE function_decldef.defid IS NULL
+            ORDER BY matching_functions.rowid;
         """)
 
         query_and_write_tags_file(conn, function_decls_query.substitute(matching_functions_table = matches['functions']), token)
 
     if matches['macros'] is not None:
         macro_decls_query = Template("""
-            SELECT DISTINCT files.path,
-                            matching_macros.file_line,
-                            matching_macros.file_col,
-                            matching_macros.name || matching_macros.args
+            SELECT files.path,
+                   matching_macros.file_line,
+                   matching_macros.file_col,
+                   matching_macros.name || matching_macros.args
             FROM $matching_macros_table AS matching_macros
-            INNER JOIN files ON files.id == matching_macros.file_id;
+            INNER JOIN files ON files.id == matching_macros.file_id
+            ORDER BY matching_macros.rowid;
         """)
 
         query_and_write_tags_file(conn, macro_decls_query.substitute(matching_macros_table = matches['macros']), token)
 
     if matches['types'] is not None:
         type_decls_query = Template("""
-            SELECT DISTINCT files.path,
-                            matching_types.file_line,
-                            matching_types.file_col,
-                            matching_types.qualname
+            SELECT files.path,
+                   matching_types.file_line,
+                   matching_types.file_col,
+                   matching_types.qualname
             FROM $matching_types_table AS matching_types
-            INNER JOIN files ON files.id == matching_types.file_id;
+            INNER JOIN files ON files.id == matching_types.file_id
+            ORDER BY matching_types.rowid;
         """)
 
         query_and_write_tags_file(conn, type_decls_query.substitute(matching_types_table = matches['types']), token)
 
     if matches['typedefs'] is not None:
         typedef_decls_query = Template("""
-            SELECT DISTINCT files.path,
-                            matching_typedefs.file_line,
-                            matching_typedefs.file_col,
-                            matching_typedefs.qualname
+            SELECT files.path,
+                   matching_typedefs.file_line,
+                   matching_typedefs.file_col,
+                   matching_typedefs.qualname
             FROM $matching_typedefs_table AS matching_typedefs
-            INNER JOIN files ON files.id == matching_typedefs.file_id;
+            INNER JOIN files ON files.id == matching_typedefs.file_id
+            ORDER BY matching_typedefs.rowid;
         """)
 
         query_and_write_tags_file(conn, typedef_decls_query.substitute(matching_typedefs_table = matches['typedefs']), token)
@@ -553,13 +573,14 @@ def query_for_decls(conn, token, from_file, from_line_start, from_line_end):
 # (the user asks, "Where is some_param declared?")
     if matches['variables'] is not None:
         variable_decls_query = Template("""
-            SELECT DISTINCT files.path,
-                            variable_decldef.file_line,
-                            variable_decldef.file_col,
-                            matching_variables.qualname
+            SELECT files.path,
+                   variable_decldef.file_line,
+                   variable_decldef.file_col,
+                   matching_variables.qualname
             FROM $matching_variables_table AS matching_variables
             INNER JOIN variable_decldef ON variable_decldef.defid == matching_variables.id
-            INNER JOIN files ON files.id == variable_decldef.file_id;
+            INNER JOIN files ON files.id == variable_decldef.file_id
+            ORDER BY matching_variables.rowid;
         """)
 
         query_and_write_tags_file(conn, variable_decls_query.substitute(matching_variables_table = matches['variables']), token)
